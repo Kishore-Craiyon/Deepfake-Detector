@@ -1,0 +1,44 @@
+# Model Configuration
+model:
+  spatial:
+    backbone: "xception"  # or "inception_v3"
+    pretrained: true
+    num_classes: 2
+    dropout_rate: 0.5
+  
+  temporal:
+    sequence_length: 16
+    hidden_size: 256
+    num_layers: 2
+    dropout_rate: 0.3
+  
+  gnn:
+    node_features: 68  # facial landmarks
+    hidden_channels: 128
+    num_layers: 3
+  
+  audio_visual:
+    audio_features: 13  # MFCC features
+    visual_features: 512
+    sync_window: 0.04  # 40ms window
+
+# Training Configuration
+training:
+  batch_size: 16
+  epochs: 50
+  learning_rate: 0.001
+  weight_decay: 0.0001
+  patience: 10
+  
+# Data Configuration
+data:
+  frame_size: [299, 299]
+  fps: 25
+  audio_sr: 16000
+  sequence_length: 16
+  
+# Paths
+paths:
+  data_root: "./data"
+  models_dir: "./models"
+  logs_dir: "./logs"
