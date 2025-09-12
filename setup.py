@@ -1,0 +1,40 @@
+from setuptools import setup, find_packages
+
+setup(
+    name="deepfake-detector",
+    version="1.0.0",
+    packages=find_packages(),
+    install_requires=[
+        "torch>=2.0.0",
+        "torchvision>=0.15.0", 
+        "tensorflow>=2.13.0",
+        "opencv-python>=4.8.0",
+        "flask>=2.3.0",
+        "numpy>=1.24.0",
+        "torch>=2.0.0",
+        "torchvision>=0.15.0",
+        "torchaudio>=2.0.0",
+        "tensorflow>=2.13.0"
+        "opencv-python>=4.8.0",
+        "dlib>=19.24.0",
+        "face-recognition>=1.3.0",
+        "librosa>=0.10.0",
+        "scikit-learn>=1.3.0",
+        "numpy>=1.24.0",
+        "pandas>=2.0.0",
+        "matplotlib>=3.7.0",
+        "seaborn>=0.12.0",
+        "flask>=2.3.0",
+        "flask-restful>=0.3.10",
+        "gunicorn>=21.0.0",
+        "pyyaml>=6.0",
+        "tqdm>=4.65.0",
+        "pillow>=10.0.0",
+        "torch-geometric>=2.3.0",
+        "torchmetrics>=1.0.0",
+        "wandb>=0.15.0"
+    ],
+    author="Your Name",
+    description="Advanced Deep Fake Detection System",
+    python_requires=">=3.8",
+)
