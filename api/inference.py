@@ -3,7 +3,9 @@ import cv2
 import numpy as np
 from pathlib import Path
 import tempfile
+import sys
 import os
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 from models.ensemble_model import DeepFakeEnsemble
 from preprocessing.video_processor import VideoProcessor
 from preprocessing.audio_processor import AudioProcessor

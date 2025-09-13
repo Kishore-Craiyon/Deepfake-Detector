@@ -1,88 +1,71 @@
-import cv2
+import librosa
 import numpy as np
-import torch
-from pathlib import Path
-import dlib
-import face_recognition
-from typing import List, Tuple, Optional
+import cv2
+from typing import Tuple, List
 
-class VideoProcessor:
-    def _init_(self, config):
+class AudioProcessor:
+    def __init__(self, config):
         self.config = config
-        self.face_detector = dlib.get_frontal_face_detector()
-        self.landmark_predictor = dlib.shape_predictor(
-            "shape_predictor_68_face_landmarks.dat"
-        )
+        self.sr = config['data']['audio_sr']
         
-    def extract_frames(self, video_path: str, max_frames: int = None) -> np.ndarray:
-        """Extract frames from video"""
-        cap = cv2.VideoCapture(video_path)
-        frames = []
+    def extract_audio_from_video(self, video_path: str) -> np.ndarray:
+        """Extract audio from video file"""
+        import moviepy.editor as mp
         
-        while cap.isOpened():
-            ret, frame = cap.read()
-            if not ret:
-                break
-                
-            frames.append(frame)
-            if max_frames and len(frames) >= max_frames:
-                break
-                
-        cap.release()
-        return np.array(frames)
+        video = mp.VideoFileClip(video_path)
+        audio = video.audio
+        
+        # Save temporary audio file
+        temp_audio = "temp_audio.wav"
+        audio.write_audiofile(temp_audio, verbose=False, logger=None)
+        
+        # Load with librosa
+        y, sr = librosa.load(temp_audio, sr=self.sr)
+        
+        # Cleanup
+        video.close()
+        import os
+        os.remove(temp_audio)
+        
+        return y
     
-    def detect_faces(self, frame: np.ndarray) -> List[Tuple[int, int, int, int]]:
-        """Detect faces in frame"""
-        rgb_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-        face_locations = face_recognition.face_locations(rgb_frame)
-        return face_locations
+    def extract_mfcc_features(self, audio: np.ndarray, n_mfcc: int = 13) -> np.ndarray:
+        """Extract MFCC features from audio"""
+        mfcc = librosa.feature.mfcc(y=audio, sr=self.sr, n_mfcc=n_mfcc)
+        return mfcc.T  # Transpose for time-first format
     
-    def extract_face_landmarks(self, frame: np.ndarray, face_bbox: Tuple) -> np.ndarray:
-        """Extract 68 facial landmarks"""
-        gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-        top, right, bottom, left = face_bbox
+    def extract_lip_region(self, frame: np.ndarray, landmarks: np.ndarray) -> np.ndarray:
+        """Extract lip region from frame using landmarks"""
+        # Lip landmarks are points 48-67
+        lip_landmarks = landmarks[48:68]
         
-        rect = dlib.rectangle(left, top, right, bottom)
-        landmarks = self.landmark_predictor(gray, rect)
+        # Get bounding box of lips
+        x_min, y_min = lip_landmarks.min(axis=0)
+        x_max, y_max = lip_landmarks.max(axis=0)
         
-        points = []
-        for i in range(68):
-            points.append([landmarks.part(i).x, landmarks.part(i).y])
-            
-        return np.array(points)
+        # Add padding
+        padding = 10
+        x_min = max(0, x_min - padding)
+        y_min = max(0, y_min - padding)
+        x_max = min(frame.shape[1], x_max + padding)
+        y_max = min(frame.shape[0], y_max + padding)
+        
+        lip_region = frame[y_min:y_max, x_min:x_max]
+        return cv2.resize(lip_region, (64, 64))
     
-    def crop_face(self, frame: np.ndarray, face_bbox: Tuple, 
-                  target_size: Tuple = (299, 299)) -> np.ndarray:
-        """Crop and resize face from frame"""
-        top, right, bottom, left = face_bbox
-        face_crop = frame[top:bottom, left:right]
-        face_crop = cv2.resize(face_crop, target_size)
-        return face_crop
-    
-    def process_video(self, video_path: str) -> dict:
-        """Process entire video and extract features"""
-        frames = self.extract_frames(video_path)
+    def synchronize_audio_visual(self, audio_features: np.ndarray, 
+                               visual_features: np.ndarray, 
+                               fps: float) -> Tuple[np.ndarray, np.ndarray]:
+        """Synchronize audio and visual features"""
+        # Calculate time alignment
+        audio_time_per_frame = len(audio_features) / (len(visual_features) * fps)
         
-        face_crops = []
-        landmarks_sequence = []
+        # Resample audio features to match video frame rate
+        from scipy.interpolate import interp1d
         
-        for frame in frames:
-            faces = self.detect_faces(frame)
-            
-            if faces:
-                # Use the largest face
-                largest_face = max(faces, key=lambda x: (x[2]-x[0]) * (x[1]-x[3]))
-                
-                # Crop face
-                face_crop = self.crop_face(frame, largest_face)
-                face_crops.append(face_crop)
-                
-                # Extract landmarks
-                landmarks = self.extract_face_landmarks(frame, largest_face)
-                landmarks_sequence.append(landmarks)
+        audio_indices = np.linspace(0, len(audio_features) - 1, len(visual_features))
+        f = interp1d(np.arange(len(audio_features)), audio_features, 
+                    axis=0, kind='linear')
+        synchronized_audio = f(audio_indices)
         
-        return {
-            'face_crops': np.array(face_crops),
-            'landmarks': np.array(landmarks_sequence),
-            'original_frames': frames
-        }
+        return synchronized_audio, visual_features
